@@ -1,0 +1,829 @@
+<!doctype html>
+<html lang="us">
+<head>
+	<meta charset="utf-8">
+	<title>Ones Game</title>
+	<script src="js/jquery-1.8.3.js"></script>
+	<script src="js/jquery-ui-1.9.2.custom.js"></script>
+	<script>
+	$(function() {
+                
+        // TODO: Add <script src="jquery.ui.touch-punch.js">
+        //       see http://www.mrgeek.me/technology/tutorials/jquery/how-to-accept-multiple-items-in-a-droppable-element-jquery/
+        //
+        // TODO: If wip is being limited,
+        //       the Done area always needs a spare empty kanban so it can empty
+        //       a full green kanban and release the empty green kanban back
+        //       to the green team.
+        //       
+        // TODO: Synchronize days. Has to be done otherwise cycle-time cannot be measured.
+        //       Could this be done by holding elements inside portals?
+        //        
+        // TODO: Roll new set of dice
+        // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        // TODO: Does it cost a 1-dice to replenish?
+        //       Does backlog have dice?
+        //
+        // TODO: Drag kanban onto [split] area to do a split.
+        //       Only possible if there is a spare empty kanban of course!
+        //       Only allow when story is done? empty?
+        //
+        // TODO: Currently dropping a 1-dice on red's upstream portal or on
+        //       green's downstream portal means you lose the dice...
+        //       This suggests that the backlog area should have dice.
+        //       But since the backlog area does not have an upstream portal
+        //       it cannot lose dice.
+        //       Same for Done area. Interestingly, backlog and done areas
+        //       only need a single 1 to complete their story, they are
+        //       unaffected by story size.
+        //       But if backlog and done do have dice what are they used for?
+        //       For dropping onto portals?
+        //       That would imply middle 4 areas would also have to pay a 1
+        //       to move a kanban onto a portal. Don't like that.
+        //
+        // TODO: What if a 1 cannot be played?
+        //       have a [wasted] area (like [split])
+        //        
+        // TODO: Make sure drag/drop etc works for newly introduced elements.
+        //
+        // TODO: Does it make sense to limit wip by limiting no of kanban?
+        //       Wouldn't it be better to limit by overall 'capacity'?
+        //       Would this make splitting easier? harder?
+        //
+        // TODO: Progression?
+        //       1. no limits. push only.
+        //       2. no limits. push and pull.
+        //               Feasible! need to be able to create empty kanban
+        //       3. limits. push only.
+        //               Viz, if I push downstream and downstream is full then the push fails
+        //       4. limits, push and pull
+        //       5. limits pull only
+        //   
+        // NOTE: [1,2,3,4,5,6].shuffle()[0] is fair dice
+        // NOTE: [1,2,3,4,5,6,1].shuffle()[0] increses chance of a 1.
+        //       Nice way to increase chances.
+        //
+        // TODO: Have 2 modes of playing the game?
+        //       mode1: start with lots of wip in all columns (no limits)
+        //              no-one wastes any dice. Some throughput
+        //              but cycle-time is massive.
+        //              If I could somehow many £ income based on deliveries
+        //              the game could simulate going out of business.        
+        //       mode2: start with very little wip in any column (limits)
+        //              some 1's are "wasted". Throught might be reasonable.
+        //              but cycle-time is tiny.
+        //        
+        // TODO: Cursor can change to a 1 when over a story with spare 1 ?
+        //
+        // TODO: Need to support 1/2 increments for dice of different colour        
+        //       Giving away a 1'dice to another column via the portal...
+        //       How do I make this worth 1/2?
+        //       Clicking on a dice does not distinguish between 1/2 and 1
+        //       I could make dice draggable again...
+        //       Or I could add a rule that you can only give
+        //       away a 1 if you have another 1 beside it that you forfeit
+        //       Making dice draggable has to be the way.
+        //       That also matches up with dragging a 1-dice onto the portal
+        //       to give it away.
+        //
+        // animation of moving storys
+        // roll button which is enabled only when all 1's are used
+        // roll button generates new 1's
+        // first backlog auto fills with 1's
+        // automatic play mode?
+        // fixed duration sprints
+        // start gathering stats
+                
+        var dropFn = function(event, ui) {
+                var dragged = $(ui.draggable);
+                var dropped = $(this);
+                var draggedClass = dragged.attr('class');
+                var droppedClass = dropped.attr('class');
+                
+                if (draggedClass.indexOf("kanban") !== -1) {
+                    if (droppedClass.indexOf("story") !== -1) {
+                        kanbanDroppedOnStory(dragged,dropped);
+                    }
+                    if (droppedClass.indexOf("downstream portal") !== -1) {
+                        kanbanDroppedOnDownstreamPortal(dragged,dropped);
+                    }
+                    if (droppedClass.indexOf("upstream portal") !== -1) {
+                        kanbanDroppedOnUpstreamPortal(dragged,dropped);
+                    }
+                }
+                if (draggedClass.indexOf("one") !== -1) {
+                    if (droppedClass.indexOf("story") !== -1) {
+                        oneDroppedOnStory(dragged,dropped);
+                    }
+                    if (droppedClass.indexOf("portal") !== -1) {
+                        oneDroppedOnPortal(dragged,dropped);
+                    }
+                }                
+        };
+
+        var kanbanDroppedOnStory = function(kanban,story) {
+            var draggeeKanban = kanban;
+            var droppeeKanban = story.parent();
+
+            var handOver = function(from, to) {            
+                var fromStory = from.story().detach();
+                var toStory = to.story().detach();                
+                from.append(toStory);
+                to.append(fromStory);
+            };            
+            
+            // both kanbans must be in the same column
+            if (draggeeKanban.parent().attr('id') !== droppeeKanban.parent().attr('id')) {
+                return;
+            }
+            
+            // allow same-colour-kanban shuffling inside a column
+            if (draggeeKanban.colour() === droppeeKanban.colour()) {
+                handOver(draggeeKanban, droppeeKanban);
+                return;
+            }
+            
+            // it must be a empty-full transfer
+            if (!draggeeKanban.story().isEmpty() || !droppeeKanban.story().isDone()) {
+                return;
+                //NB: allow draggee/droppee in other direction?
+            }
+            
+            // fullfil a pull request
+            if (droppeeKanban.colour() === droppeeKanban.parent().attr('id')) {
+                handOver(droppeeKanban, draggeeKanban);
+                return;
+            }
+            
+            // empty a pushed full kanban
+            if (draggeeKanban.colour() === draggeeKanban.parent().attr('id')) {
+                droppeeKanban.story().reset();
+                handOver(draggeeKanban, droppeeKanban);
+                return;
+            }
+        };
+        
+        var kanbanDroppedOnUpstreamPortal = function(kanban,portal) {
+            var from = portal.attr('from');
+            var to = portal.attr('to');
+            if (kanban.story().isEmpty()) {                
+                if (pullingAllowed() && kanban.colour() === from) {
+                    // send empty-kanban upstream - regular pull request
+                    $('#' + to).append(kanban.detach());
+                }
+                if (pushingAllowed() && kanban.colour() === to) {
+                    // return pushed then emptied kanban
+                    $('#' + to).append(kanban.detach());
+                }                
+            }
+        };
+        
+        var kanbanDroppedOnDownstreamPortal = function(kanban,portal) {
+            var toColour = portal.attr('to');
+            var fromColour = portal.attr('from');
+            if (kanban.story().isDone()) {
+                if (pushingAllowed() && kanban.colour() === fromColour) {
+                    // push a full kanban                    
+                    if (!wipIsLimited()) {
+                        var story = kanban.detach().story().detach();                        
+                        $('#' + toColour).append(newKanban(toColour, story.reset()));
+                        story.display();
+                    } else {                    
+                        $('#' + toColour).append(kanban.detach());
+                        kanban.story().display();
+                    }
+                }
+                if (pullingAllowed() && kanban.colour() === toColour) {
+                    // returning a filled-up pull request
+                    $('#' + toColour).append(kanban.detach());
+                    kanban.story().reset();                    
+                }                
+            }
+        };
+                
+        var oneDroppedOnStory = function(one,story) {
+            //TODO: check if dice colour matches kanban colour (1 vs 1/2)
+            // '&#189;' == half            
+            var kanban = story.parent();
+            if (!story.isDone() && kanban.colour() === one.parent().attr('class')) {
+                one.detach();
+                story.addOne();
+            }
+        };
+        
+        var oneDroppedOnPortal = function(one,portal) {
+            if (one.parent().attr('class') !== portal.attr('from')) {
+                return;
+            }
+            $('#' + portal.attr('to') + '-dice').append(one.detach());
+        };
+        
+        //- - - - - - - - - - - - - - - - - - - - - - - - - - -
+        
+        var makeDraggable = function(nodes) {
+            return nodes.draggable({
+                stack: "div",
+                revert: true,
+                revertDuration: 0,
+                helper: 'original',
+                opacity: 0.75                        
+            });            
+        };
+        
+        var makeDroppable = function(nodes) {
+            return nodes.droppable({
+                hoverClass: "hover",
+                //accept: ...
+                drop: dropFn
+            });            
+        };
+        
+        //- - - - - - - - - - - - - - - - - - - - - - - - - - -
+        
+        var newKanban = function(colour, story) {
+            return makeDraggable(
+                $('<div>', {
+                    'class': 'draggable ' + colour + ' kanban'
+                }).append(story));
+        };
+
+        // <div class="droppable story" ones="111" size="111"></div>
+        var newStory = function(size) {
+            return $('<div>', {
+                'class': 'droppable story',
+                'ones': '111',
+                'size': '111'
+            });
+        };
+
+        //- - - - - - - - - - - - - - - - - - - - - - - - - - -
+        
+        var kanbanInfo = function(kanban) {
+            return "" +
+               "kanban.colour()=" + kanban.colour() + "\n";
+        };        
+        var portalInfo = function(portal) {
+            return "" +
+               "portal.attr('from')=" + portal.attr('from') + "\n" +
+               "portal.attr('to')=" + portal.attr('to') + "\n";
+        };        
+        var storyInfo = function(story) {
+            return "" +
+               "story.isDone()=" + story.isDone() + "\n" +
+               "story.isEmpty()=" + story.isEmpty() + "\n";
+        };        
+        
+        //- - - - - - - - - - - - - - - - - - - - - - - - - - -
+                        
+        var pushingAllowed = function() {
+            return $('#push-checkbox').is(':checked');
+        };
+        
+        var pullingAllowed = function() {
+            return $('#pull-checkbox').is(':checked');            
+        };
+        
+        var wipIsLimited = function() {
+            return $('#wip-limit').is(':checked');                    
+        };
+                        
+        //- - - - - - - - - - - - - - - - - - - - - - - - - - -
+        
+        $.fn.getOnes   = function() {
+            return this.attr('ones').length;
+        };
+
+        $.fn.getSize   = function() {
+            return this.attr('size').length;
+        };
+        
+		$.fn.display = function(/*story*/) {
+            var team = this.parent().parent().attr('id');
+            if (team === 'backlog' || team === 'done') {
+                this.html(this.getSize());
+            } else {
+                this.html(this.getOnes() + "-" + this.getSize());
+            }
+            return this;
+        };
+        
+        $.fn.isDone    = function() {
+            return this.getOnes() === this.getSize();
+        };        
+        $.fn.isEmpty = function() {
+            return this.attr('class').indexOf('empty-story') !== -1;
+        };
+
+        $.fn.reset = function() {        
+            this.attr('ones', '');                
+            this.display();
+            return this;
+        };
+
+        $.fn.addOne = function() {
+            this.attr('ones', this.attr('ones')+"1");                    
+            this.display();                
+        };
+        
+        $.fn.story = function() { return $(this.children()[0]); };
+
+        $.fn.colour = function() {
+            if (this.attr('class').indexOf('red') !== -1)
+                return 'red';
+            if (this.attr('class').indexOf('blue') !== -1)
+                return 'blue';
+            if (this.attr('class').indexOf('yellow') !== -1)
+                return 'yellow';
+            if (this.attr('class').indexOf('green') !== -1)
+                return 'green';
+            if (this.attr('class').indexOf('backlog') !== -1)
+                return 'backlog';
+            if (this.attr('class').indexOf('done') !== -1)
+                return 'done';
+        };
+		        
+        var addHeading = function(node, heading) {
+            $(node).prepend('<div class="heading">' + heading + '</div>');
+        };
+        
+        var wipShortfall = function(area) {
+            var stories = $('.' + area + '.kanban .story');
+            var empties = $('.' + area + '.kanban .empty-story');
+            var wipLimit = 4;
+            return wipLimit - stories.size() - empties.size();
+        };
+                
+        addHeading($('.backlog.team'), 'Backlog');
+        addHeading($('.red.team'    ), 'Red'    );
+        addHeading($('.yellow.team' ), 'Yellow' );
+        addHeading($('.blue.team'   ), 'Blue'   );
+        addHeading($('.green.team'  ), 'Green'  );
+        addHeading($('.done.team'   ), 'Done'   );
+        
+        makeDraggable($('.draggable'));
+        makeDroppable($('.droppable'));
+        
+		$('.story, .empty-story').each(function() { $(this).display(); });
+              
+        $('#replenish').click(function() {
+            if (!wipIsLimited() || wipShortfall('backlog') > 0) {            
+                //TODO: offer dialog with size selection            
+                var story = $("<div class='droppable story' ones='111' size='111'></div>");
+                $('#backlog').append(newKanban('backlog', makeDroppable(story)));
+                story.display();
+            }
+        });
+            
+        $('#push-checkbox').click(function() {
+            var push = $(this);
+            var pull = $('#pull-checkbox');
+            if (!push.is(':checked') && !pull.is(':checked')) {
+                pull.prop('checked', true);
+            }
+        });
+        
+        $('#pull-checkbox').click(function() {
+            var pull = $(this);
+            var push = $('#push-checkbox');
+            if (!push.is(':checked') && !pull.is(':checked')) {
+                push.prop('checked', true);
+            }
+        });
+        
+        $('#wip-limit').click(function() {
+            if (wipIsLimited()) {
+                $.each(['backlog','red','yellow','blue','green','done'], function(n,area) {
+                    var shortfall = wipShortfall(area);
+                    for (var at = 0; at < shortfall; at++) {
+                        //TODO: refactor to use newStory?
+                        var empty = $("<div class='empty-story' ones='' size='x'></div>");
+                        $('#' + area).append(newKanban(area, empty.display()));
+                    }
+                });                
+            } else {
+                var empties = $('.kanban .empty-story');
+                for (var at = 0; at !== empties.size(); at++) {
+                    $(empties[at]).parent().detach();
+                }
+            }            
+        });
+        
+	});
+	</script>
+	<style>
+	body{
+		font: 52.5% "Trebuchet MS", sans-serif;
+		margin: 10px;
+		background: Moccasin;
+	}
+    tr { vertical-align: top; }
+    .panel {
+        border: 1px solid DarkGray;
+        border-radius: 6px;
+        -moz-border-radius: 6px;                                                
+		padding: 4px;
+    }
+    .heading { text-align: center; }
+	.backlog.area, .wip.area, .done.area
+	{
+        border-radius: 6px;
+        -moz-border-radius: 6px;                                                
+		margin: 2px;
+		padding: 2px;
+		width: 5em;
+        height: 150em;
+		float: left;
+        background: White;
+        border: 3px solid White;        
+	}
+    
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    
+	.one:before { content: "\2022"; } /* single bullet */
+	.one
+	{
+        border-radius: 4px;
+        -moz-border-radius: 4px;                                                
+		display: inline;
+		padding: 2px 6px 3px 7px;  /* top right bottom left */
+		font-size: 1.2em;
+        color: White;
+	}
+    .red.one    { background: Red;     }
+    .yellow.one { background: #FFBF00; }
+    .blue.one   { background: Blue;    }
+    .green.one  { background: Green;   }
+        
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    
+    #red-dice, #yellow-dice, #blue-dice, #green-dice {
+        vertical-align: bottom;
+        text-align: center;
+    }    
+        
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+        
+    .kanban {
+        border-radius: 4px;
+        -moz-border-radius: 4px;                                        
+        padding: 2px;
+        margin: 2px;
+    }
+    .backlog.kanban { background: DarkGray; border: 1px solid DarkGray; }
+    .red.kanban     { background: Red;      border: 1px solid Red;      }
+    .yellow.kanban  { background: #FFBF00;  border: 1px solid #FFBF00;  }    
+    .blue.kanban    { background: Blue;     border: 1px solid Blue;     }
+    .green.kanban   { background: Green;    border: 1px solid Green;    }    
+    .done.kanban    { background: DarkGray; border: 1px solid DarkGray; }
+    
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+	.story, .empty-story
+	{
+        border-radius: 4px;
+        -moz-border-radius: 4px;                                
+		font-size: 1.4em;
+		margin: 2px;
+		background: LightGray;
+        border: 3px solid LightGray;
+		text-align: center;
+	}
+    
+    .backlog.kanban .empty-story {
+        background: DarkGray;
+        color: DarkGray;
+        border: 3px solid DarkGray;
+    }
+    
+    
+    .red.kanban .empty-story {
+        background: Red;
+        color: Red;
+        border: 3px solid Red;
+    }
+    
+    .yellow.kanban .empty-story {
+        background: #FFBF00;
+        color: #FFBF00;
+        border: 3px solid #FFBF00;
+    }
+
+    .blue.kanban .empty-story {
+        background: Blue;
+        color: Blue;
+        border: 3px solid Blue;
+    }
+
+    .green.kanban .empty-story {
+        background: Green;
+        color: Green;
+        border: 3px solid Green;
+    }
+    
+    .done.kanban .empty-story {
+        background: DarkGray;
+        color: DarkGray;
+        border: 3px solid DarkGray;
+    }
+    
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    .team {
+        border-radius: 6px;
+        -moz-border-radius: 6px;
+        padding: 6px;
+    }
+
+    .backlog.team { background: DarkGray; }
+    .red.team     { background: Red;      }    
+    .yellow.team  { background: #FFBF00;  }
+    .blue.team    { background: Blue;     }
+    .green.team   { background: Green;    }
+    .done.team    { background: DarkGray; }    
+
+    .team  .heading { color: White; }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    
+    .portal {
+        border-radius: 4px;
+        -moz-border-radius: 4px;                                                
+		margin: 2px;
+		padding: 2px;
+		width: 2em;
+        height: 20em;
+		float: left;
+        background: DarkGray;
+        border: 3px solid White;        
+    }
+
+    div[class~=portal][to~=red] {
+        background: Red;
+    }
+    div[class~=portal][to~=yellow] {
+        background: #FFBF00;
+    }
+    div[class~=portal][to~=blue] {
+        background: Blue;
+    }
+    div[class~=portal][to~=green] {
+        background: Green;
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    input[type=button] {
+        text-align: center;    
+    }
+    
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    
+    .hover {
+        border: 3px dashed Gray;
+    }
+    .ui-draggable-dragging.kanban { border: 1px solid Black; }
+    .ui-draggable-dragging.one    { border: 1px solid Black; }
+    
+	</style>
+</head>
+<body>
+
+<table cellspacing="12" align="center">
+    <tr>
+        <td colspan="6">
+            <!-- options -->
+            <table align="center">
+                <tr>
+                    <td>
+                        <div class="panel">
+                            <input type="checkbox" id="push-checkbox" name="push" value="Push">Allow pushing?
+                            <input type="checkbox" id="pull-checkbox" name="pull" value="Pull">Allow pulling?
+                        </div>
+                    </td>
+                    <td>
+                        <div class="panel">
+                            <input type="checkbox" id="wip-limit" name="wip-limit" value="wip-limit">Limit WIP?<br>
+                        </div>
+                    </td>
+                    <!-- share dice? -->
+                    <!-- splitting? -->
+                </tr>
+            </table>
+        </td>                
+    </tr>
+    
+    
+	<tr valign="bottom">
+        <!-- dice -->
+        
+        <td align="center">
+            <input type="button" name="replenish" id="replenish" value="replenish">
+        </td>
+        
+		<td id="red-dice" class="red">
+			<div class="draggable red one"></div>
+			<div class="draggable red one"></div>
+			<div class="draggable red one"></div>
+		</td>                
+        
+		<td id="yellow-dice" class="yellow">
+			<div class="draggable yellow one"></div>
+			<div class="draggable yellow one"></div>
+			<div class="draggable yellow one"></div>
+			<div class="draggable yellow one"></div>
+		</td>        
+        
+		<td id="blue-dice" class="blue">
+			<div class="draggable blue one"></div>
+			<div class="draggable blue one"></div>
+		</td>        
+        
+		<td id="green-dice" class="green">
+			<div class="draggable green one"></div>
+			<div class="draggable green one"></div>			
+		</td>        
+                
+        <td>
+            <!-- done -->
+        </td>
+        
+	</tr>
+    
+	<tr>
+        <td class="backlog team">
+            <table>
+                <tr>
+                    
+                    <td>                        
+                        <div class="backlog area" id="backlog">
+                            <div class="draggable backlog kanban">
+                                <div class="droppable story" ones="111" size="111"></div>
+                            </div>
+                            <div class="draggable backlog kanban">
+                                <div class="droppable story" ones="11" size="11"></div>
+                            </div>
+                            <div class="draggable backlog kanban">
+                                <div class="droppable story" ones="1" size="1"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="droppable downstream portal" from="backlog" to="red"></div>
+                    </td>
+                    
+                </tr>
+            </table>
+        </td>
+        
+        
+        <td class="red team">
+            <table>
+                <tr>
+                    
+                    <td>
+                        <div class="droppable upstream portal" from="red" to="backlog"></div>
+                    </td>        
+                    <td>
+                        <div class="wip area" id="red">
+                            <div class="draggable red kanban">
+                                <div class="droppable story" ones="1" size="1"></div>
+                            </div>
+                            <div class="draggable red kanban">
+                                <div class="droppable story" ones="11" size="11"></div>
+                            </div>
+                            <div class="draggable red kanban">                
+                                <div class="droppable story" ones="" size="11111"></div>
+                            </div>
+                            <div class="draggable red kanban">                
+                                <div class="empty-story" ones="" size="x"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="droppable downstream portal" from="red" to="yellow"></div>
+                    </td>
+        
+                </tr>
+            </table>
+        </td>
+        
+        
+        
+        <td class="yellow team">
+            <table>
+                <tr>
+        
+                    <td>
+                        <div class="droppable upstream portal" from="yellow" to="red"></div>
+                    </td>
+                    <td>
+                        <div class="wip area" id="yellow">
+                            <div class="draggable yellow kanban">                
+                                <div class="droppable story" ones="11" size="1111111"></div>
+                            </div>
+                            <div class="draggable yellow kanban">                
+                                <div class="droppable story" ones="11" size="111"></div>
+                            </div>
+                            <div class="draggable yellow kanban">                
+                                <div class="empty-story" ones="" size="x"></div>
+                            </div>                
+                            <div class="draggable yellow kanban">                
+                                <div class="empty-story" ones="" size="x"></div>
+                            </div>                
+                        </div>
+                    </td>
+                    <td>
+                        <div class="droppable downstream portal" from="yellow" to="blue"></div>            
+                    </td>
+        
+                </tr>
+            </table>
+        </td>
+    
+    
+    
+        <td class="blue team">
+            <table>
+                <tr>
+
+                    <td>
+                        <div class="droppable upstream portal" from="blue" to="yellow"></div>
+                    </td>        
+                    <td>
+                        <div class="wip area" id="blue">
+                            <div class="draggable blue kanban">                
+                                <div class="droppable story" ones="1"    size="111"></div>
+                            </div>
+                            <div class="draggable blue kanban">                
+                                <div class="droppable story" ones="1111" size="11111"></div>
+                            </div>
+                            <div class="draggable blue kanban">                
+                                <div class="empty-story" ones="" size="x"></div>
+                            </div>                
+                        </div>
+                    </td>
+                    <td>
+                        <div class="droppable downstream portal" from="blue" to="green"></div>
+                    </td>
+        
+                </tr>
+            </table>
+        </td>
+        
+        
+        
+        <td class="green team">
+            <table>
+                <tr>
+        
+                    <td>
+                        <div class="droppable upstream portal" from="green" to="blue"></div>
+                    </td>
+                    <td>
+                        <div class="wip area" id="green">
+                            <div class="draggable green kanban">                                
+                                <div class="droppable story" ones="11" size="111"></div>
+                            </div>
+                            <div class="draggable green kanban">                
+                                <div class="empty-story" ones="" size="x"></div>
+                            </div>                
+                            <div class="draggable green kanban">                
+                                <div class="empty-story" ones="" size="x"></div>
+                            </div>                                
+                        </div>
+                    </td>
+                    <td>
+                        <div class="droppable downstream portal" from="green" to="done"></div>
+                    </td>
+        
+                </tr>
+            </table>
+        </td>
+        
+        <td class="done team">
+            <table>
+                <tr>
+                            
+                    <td>
+                        <div class="droppable upstream portal" from="done" to="green"></div>
+                    </td>
+                    <td>
+                        <div class="done area" id="done">
+                            <div class="draggable done kanban">                
+                                <div class="story" ones="111" size="111"></div>
+                            </div>                                                        
+                            <div class="draggable done kanban">                
+                                <div class="empty-story" ones="" size="x"></div>
+                            </div>                                                        
+                        </div>			
+                    </td>
+                    
+                </tr>
+            </table>
+        </td>
+	</tr>
+</table>
+
+</body>
+</div>
+</html>
