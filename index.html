@@ -453,16 +453,19 @@
         
     .kanban {
         border-radius: 4px;
+		border-width: 1px;
+		border-style: solid; 
         -moz-border-radius: 4px;                                        
         padding: 2px;
         margin: 2px;
     }
-    .backlog.kanban { background: DarkGray; border: 1px solid DarkGray; }
-    .red.kanban     { background: Red;      border: 1px solid Red;      }
-    .orange.kanban  { background: #FFBF00;  border: 1px solid #FFBF00;  }    
-    .blue.kanban    { background: Blue;     border: 1px solid Blue;     }
-    .green.kanban   { background: Green;    border: 1px solid Green;    }    
-    .done.kanban    { background: DarkGray; border: 1px solid DarkGray; }
+	
+    .backlog.kanban { background: DarkGray; border-color: DarkGray; }
+    .red.kanban     { background: Red;      border-color: Red;      }
+    .orange.kanban  { background: #FFBF00;  border-color: #FFBF00;  }    
+    .blue.kanban    { background: Blue;     border-color: Blue;     }
+    .green.kanban   { background: Green;    border-color: Green;    }    
+    .done.kanban    { background: DarkGray; border-color: DarkGray; }
     
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -477,41 +480,45 @@
 		text-align: center;
 	}
     
+	.kanban .empty-story {
+	    border-style: solid;
+		border-width: 3px;
+	}
+	
     .backlog.kanban .empty-story {
         background: DarkGray;
         color: DarkGray;
-        border: 3px solid DarkGray;
+        border-color: DarkGray;
     }
-    
-    
+        
     .red.kanban .empty-story {
         background: Red;
         color: Red;
-        border: 3px solid Red;
+        border-color: Red;
     }
     
     .orange.kanban .empty-story {
         background: #FFBF00;
         color: #FFBF00;
-        border: 3px solid #FFBF00;
+        border-color: #FFBF00;
     }
 
     .blue.kanban .empty-story {
         background: Blue;
         color: Blue;
-        border: 3px solid Blue;
+        border-color: Blue;
     }
 
     .green.kanban .empty-story {
         background: Green;
         color: Green;
-        border: 3px solid Green;
+        border-color: Green;
     }
     
     .done.kanban .empty-story {
         background: DarkGray;
         color: DarkGray;
-        border: 3px solid DarkGray;
+        border-color: DarkGray;
     }
     
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
