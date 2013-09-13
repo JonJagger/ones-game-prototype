@@ -332,8 +332,8 @@
                 return 'red';
             if (this.attr('class').indexOf('blue') !== -1)
                 return 'blue';
-            if (this.attr('class').indexOf('yellow') !== -1)
-                return 'yellow';
+            if (this.attr('class').indexOf('orange') !== -1)
+                return 'orange';
             if (this.attr('class').indexOf('green') !== -1)
                 return 'green';
             if (this.attr('class').indexOf('backlog') !== -1)
@@ -342,24 +342,13 @@
                 return 'done';
         };
 		        
-        var addHeading = function(node, heading) {
-            $(node).prepend('<div class="heading">' + heading + '</div>');
-        };
-        
         var wipShortfall = function(area) {
             var stories = $('.' + area + '.kanban .story');
             var empties = $('.' + area + '.kanban .empty-story');
             var wipLimit = 4;
             return wipLimit - stories.size() - empties.size();
         };
-                
-        addHeading($('.backlog.team'), 'Backlog');
-        addHeading($('.red.team'    ), 'Red'    );
-        addHeading($('.yellow.team' ), 'Yellow' );
-        addHeading($('.blue.team'   ), 'Blue'   );
-        addHeading($('.green.team'  ), 'Green'  );
-        addHeading($('.done.team'   ), 'Done'   );
-        
+                        
         makeDraggable($('.draggable'));
         makeDroppable($('.droppable'));
         
@@ -392,7 +381,7 @@
         
         $('#wip-limit').click(function() {
             if (wipIsLimited()) {
-                $.each(['backlog','red','yellow','blue','green','done'], function(n,area) {
+                $.each(['backlog','red','orange','blue','green','done'], function(n,area) {
                     var shortfall = wipShortfall(area);
                     for (var at = 0; at < shortfall; at++) {
                         //TODO: refactor to use newStory?
@@ -423,7 +412,6 @@
         -moz-border-radius: 6px;                                                
 		padding: 4px;
     }
-    .heading { text-align: center; }
 	.backlog.area, .wip.area, .done.area
 	{
         border-radius: 6px;
@@ -450,13 +438,13 @@
         color: White;
 	}
     .red.one    { background: Red;     }
-    .yellow.one { background: #FFBF00; }
+    .orange.one { background: #FFBF00; }
     .blue.one   { background: Blue;    }
     .green.one  { background: Green;   }
         
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
     
-    #red-dice, #yellow-dice, #blue-dice, #green-dice {
+    #red-dice, #orange-dice, #blue-dice, #green-dice {
         vertical-align: bottom;
         text-align: center;
     }    
@@ -471,7 +459,7 @@
     }
     .backlog.kanban { background: DarkGray; border: 1px solid DarkGray; }
     .red.kanban     { background: Red;      border: 1px solid Red;      }
-    .yellow.kanban  { background: #FFBF00;  border: 1px solid #FFBF00;  }    
+    .orange.kanban  { background: #FFBF00;  border: 1px solid #FFBF00;  }    
     .blue.kanban    { background: Blue;     border: 1px solid Blue;     }
     .green.kanban   { background: Green;    border: 1px solid Green;    }    
     .done.kanban    { background: DarkGray; border: 1px solid DarkGray; }
@@ -502,7 +490,7 @@
         border: 3px solid Red;
     }
     
-    .yellow.kanban .empty-story {
+    .orange.kanban .empty-story {
         background: #FFBF00;
         color: #FFBF00;
         border: 3px solid #FFBF00;
@@ -536,12 +524,12 @@
 
     .backlog.team { background: DarkGray; }
     .red.team     { background: Red;      }    
-    .yellow.team  { background: #FFBF00;  }
+    .orange.team  { background: #FFBF00;  }
     .blue.team    { background: Blue;     }
     .green.team   { background: Green;    }
     .done.team    { background: DarkGray; }    
 
-    .team  .heading { color: White; }
+    .team  .heading { color: White; font-size: 2em; }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
     
@@ -550,7 +538,7 @@
         -moz-border-radius: 4px;                                                
 		margin: 2px;
 		padding: 2px;
-		width: 2em;
+		width: 1.5em;
         height: 20em;
 		float: left;
         background: DarkGray;
@@ -560,7 +548,7 @@
     div[class~=portal][to~=red] {
         background: Red;
     }
-    div[class~=portal][to~=yellow] {
+    div[class~=portal][to~=orange] {
         background: #FFBF00;
     }
     div[class~=portal][to~=blue] {
@@ -596,8 +584,8 @@
                 <tr>
                     <td>
                         <div class="panel">
-                            <input type="checkbox" id="push-checkbox" name="push" value="Push">Allow pushing?
-                            <input type="checkbox" id="pull-checkbox" name="pull" value="Pull">Allow pulling?
+                            <input type="checkbox" id="push-checkbox" name="push" value="Push">Pushing?
+                            <input type="checkbox" id="pull-checkbox" name="pull" value="Pull">Pulling?
                         </div>
                     </td>
                     <td>
@@ -626,11 +614,11 @@
 			<div class="draggable red one"></div>
 		</td>                
         
-		<td id="yellow-dice" class="yellow">
-			<div class="draggable yellow one"></div>
-			<div class="draggable yellow one"></div>
-			<div class="draggable yellow one"></div>
-			<div class="draggable yellow one"></div>
+		<td id="orange-dice" class="orange">
+			<div class="draggable orange one"></div>
+			<div class="draggable orange one"></div>
+			<div class="draggable orange one"></div>
+			<div class="draggable orange one"></div>
 		</td>        
         
 		<td id="blue-dice" class="blue">
@@ -700,7 +688,7 @@
                         </div>
                     </td>
                     <td>
-                        <div class="droppable downstream portal" from="red" to="yellow"></div>
+                        <div class="droppable downstream portal" from="red" to="orange"></div>
                     </td>
         
                 </tr>
@@ -709,31 +697,31 @@
         
         
         
-        <td class="yellow team">
+        <td class="orange team">
             <table>
                 <tr>
         
                     <td>
-                        <div class="droppable upstream portal" from="yellow" to="red"></div>
+                        <div class="droppable upstream portal" from="orange" to="red"></div>
                     </td>
                     <td>
-                        <div class="wip area" id="yellow">
-                            <div class="draggable yellow kanban">                
-                                <div class="droppable story" ones="11" size="1111111"></div>
+                        <div class="wip area" id="orange">
+                            <div class="draggable orange kanban">                
+                                <div class="droppable story" ones="11" size="111111"></div>
                             </div>
-                            <div class="draggable yellow kanban">                
+                            <div class="draggable orange kanban">                
                                 <div class="droppable story" ones="11" size="111"></div>
                             </div>
-                            <div class="draggable yellow kanban">                
+                            <div class="draggable orange kanban">                
                                 <div class="empty-story" ones="" size="x"></div>
                             </div>                
-                            <div class="draggable yellow kanban">                
+                            <div class="draggable orange kanban">                
                                 <div class="empty-story" ones="" size="x"></div>
                             </div>                
                         </div>
                     </td>
                     <td>
-                        <div class="droppable downstream portal" from="yellow" to="blue"></div>            
+                        <div class="droppable downstream portal" from="orange" to="blue"></div>            
                     </td>
         
                 </tr>
@@ -747,7 +735,7 @@
                 <tr>
 
                     <td>
-                        <div class="droppable upstream portal" from="blue" to="yellow"></div>
+                        <div class="droppable upstream portal" from="blue" to="orange"></div>
                     </td>        
                     <td>
                         <div class="wip area" id="blue">
